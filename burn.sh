@@ -1,0 +1,1 @@
+cd ./build && avrdude -p atmega8 -c usbasp -U flash:w:firmware.hex:i -F -P usb && cd ..
