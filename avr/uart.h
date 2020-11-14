@@ -18,4 +18,6 @@
 
 void uart_init();
 
+void uart_write(const char *data);
+
 #endif //CNC_UART_H

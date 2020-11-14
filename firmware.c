@@ -6,6 +6,7 @@ void send();
 int main()
 {
     uart_init();
+//    cnc_init();
 
     sei();
 

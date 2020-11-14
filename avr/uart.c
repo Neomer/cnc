@@ -3,18 +3,30 @@
 //
 
 #include "uart.h"
+#include "gcode.h"
 
 #include <inttypes.h>
 #include <avr/io.h>
 #include <util/delay.h>
 
 #define UART_RX_BUFFER_SIZE            128
-#define UART_TX_BUFFER_SIZE            10
+#define UART_TX_BUFFER_SIZE            30
 
-volatile char rx[UART_RX_BUFFER_SIZE];
-volatile const char *tx = "ok";
-volatile uint8_t wp = 0;
-volatile uint8_t rp = 0;
+static volatile char rx[UART_RX_BUFFER_SIZE + 1];
+static volatile char tx[UART_TX_BUFFER_SIZE + 1];
+static volatile uint8_t wp = 0;
+static volatile uint8_t rp = 0;
+
+inline void uart_en_rx() {
+    UCSRB &= ~(1 << UDRIE);
+    UCSRB |= (1 << RXEN);
+}
+
+
+inline void uart_en_tx() {
+    UCSRB |= (1 << UDRIE);
+    UCSRB &= ~(1 << RXEN);
+}
 
 /**
  * Called when USART completes receiving data
@@ -27,8 +39,8 @@ ISR(USART_RXC_vect)
     char ch = UDR;
     if ((UCSRA & UART_ERROR_MASK) == 0) {
         if (ch == '_' || wp >= UART_RX_BUFFER_SIZE) {
-            UCSRB &= ~(1 << RXEN);
-            UCSRB |= (1 << UDRIE);
+            rx[wp] = 0;
+            gcode_exec((const char *)rx, wp);
         } else {
             rx[wp++] = ch;
         }
@@ -43,12 +55,11 @@ ISR(USART_RXC_vect)
  */
 ISR(USART_UDRE_vect)
 {
-    if (rp >= 3) {
+    if (tx[rp] == 0) {
         rp = 0;
         wp = 0;
 
-        UCSRB &= ~(1 << UDRIE);
-        UCSRB |= (1 << RXEN);
+        uart_en_rx();
     } else {
         UDR = tx[rp++];
     }
@@ -63,4 +74,13 @@ void uart_init()
     // setup params
     UCSRB = CSRCB;
     UCSRC = CSRCC;
+}
+
+void uart_write(const char *data)
+{
+    uint8_t i;
+    for (i = 0; i < UART_TX_BUFFER_SIZE && data[i]; ++i) {
+        tx[i] = data[i];
+    }
+    uart_en_tx();
 }
